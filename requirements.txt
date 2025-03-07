@@ -26,7 +26,6 @@ python-dateutil==2.8.2
 tqdm==4.65.0
 
 # Journalisation et configuration
-logging==0.5.1.2
 pyyaml==6.0.1
 
 # Tests
