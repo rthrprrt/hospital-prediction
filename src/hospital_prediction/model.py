@@ -7,7 +7,7 @@ import seaborn as sns
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.model_selection import TimeSeriesSplit
+from sklearn.model_selection import TimeSeriesSplit, train_test_split
 from sklearn.pipeline import Pipeline
 import joblib
 import os
@@ -21,6 +21,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger('hospital_prediction.model')
+
 
 class HospitalPredictionModel:
     """
@@ -545,7 +546,7 @@ class HospitalPredictionModel:
     
     def plot_feature_importance(self, model_type='both', top_n=10):
         """
-        Visualiser l'importance des features
+        Génération du graphique d'importance des features
         
         Args:
             model_type: Type de modèle ('admissions', 'occupancy', ou 'both')
@@ -559,65 +560,29 @@ class HospitalPredictionModel:
         if model_type not in ['admissions', 'occupancy', 'both']:
             raise ValueError("model_type doit être 'admissions', 'occupancy' ou 'both'")
         
-        if model_type == 'both':
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-            
-            # Importance des features pour le modèle d'admissions
-            if self.feature_importance_admission:
-                sorted_features = sorted(
-                    self.feature_importance_admission.items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                )[:top_n]
-                
-                features, importances = zip(*sorted_features)
-                
-                ax1.barh(range(len(features)), importances, align='center')
-                ax1.set_yticks(range(len(features)))
-                ax1.set_yticklabels(features)
-                ax1.set_title("Importance des features - Modèle d'admissions")
-                ax1.set_xlabel('Importance')
-            
-            # Importance des features pour le modèle de taux d'occupation
-            if self.feature_importance_occupancy:
-                sorted_features = sorted(
-                    self.feature_importance_occupancy.items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                )[:top_n]
-                
-                features, importances = zip(*sorted_features)
-                
-                ax2.barh(range(len(features)),ax2.barh(range(len(features)), importances, align='center')
-                ax2.set_yticks(range(len(features)
-                ax2.set_yticklabels(features)
-                ax2.set_title("Importance des features - Modèle de taux d'occupation")
-                ax2.set_xlabel('Importance')
-            
-            plt.tight_layout()
-            
-        else:
-            fig, ax = plt.subplots(figsize=(10, 6))
-            
-            feature_importance = self.feature_importance_admission if model_type == 'admissions' else self.feature_importance_occupancy
-            
-            if feature_importance:
-                sorted_features = sorted(
-                    feature_importance.items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                )[:top_n]
-                
-                features, importances = zip(*sorted_features)
-                
-                ax.barh(range(len(features)), importances, align='center')
-                ax.set_yticks(range(len(features)))
-                ax.set_yticklabels(features)
-                ax.set_title(f"Importance des features - Modèle de {model_type}")
-                ax.set_xlabel('Importance')
-            
-            plt.tight_layout()
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6)) if model_type == 'both' else plt.subplots(figsize=(10, 6))
         
+        if model_type in ['admissions', 'both'] and self.feature_importance_admission:
+            sorted_features_admissions = sorted(self.feature_importance_admission.items(), key=lambda x: x[1], reverse=True)[:top_n]
+            features_adm, importances_adm = zip(*sorted_features_admissions)
+            ax1 = axes[0] if model_type == 'both' else axes
+            ax1.barh(range(len(features_adm)), importances_adm, align='center')
+            ax1.set_yticks(range(len(features_adm)))
+            ax1.set_yticklabels(features_adm)
+            ax1.set_title("Importance des features - Admissions")
+            ax1.set_xlabel('Importance')
+        
+        if model_type in ['occupancy', 'both'] and self.feature_importance_occupancy:
+            sorted_features_occ = sorted(self.feature_importance_occupancy.items(), key=lambda x: x[1], reverse=True)[:top_n]
+            features_occ, importances_occ = zip(*sorted_features_occ)
+            ax2 = axes[1] if model_type == 'both' else axes
+            ax2.barh(range(len(features_occ)), importances_occ, align='center')
+            ax2.set_yticks(range(len(features_occ)))
+            ax2.set_yticklabels(features_occ)
+            ax2.set_title("Importance des features - Modèle d'occupation")
+            ax2.set_xlabel('Importance')
+        
+        plt.tight_layout()
         return fig
     
     def plot_predictions(self, X, y_true_admissions=None, y_true_occupancy=None, dates=None, future_days=0):
@@ -859,4 +824,3 @@ def predict_future_admissions(model, last_data, days=30):
     future_df = model.predict_future(last_data, days)
     
     return future_df
-                         
