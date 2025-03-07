@@ -589,7 +589,7 @@ class HospitalPredictionModel:
                 features, importances = zip(*sorted_features)
                 
                 ax2.barh(range(len(features)),ax2.barh(range(len(features)), importances, align='center')
-                ax2.set_yticks(range(len(features)))
+                ax2.set_yticks(range(len(features)
                 ax2.set_yticklabels(features)
                 ax2.set_title("Importance des features - Modèle de taux d'occupation")
                 ax2.set_xlabel('Importance')
