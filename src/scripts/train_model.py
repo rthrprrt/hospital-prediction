@@ -64,41 +64,52 @@ def train_model(input_file: str, model_dir: str = 'models', output_dir: str = 'd
 
     logger.info("Démarrage de l'entraînement du modèle...")
 
-    # Vérifier si le fichier est "synthetic" et le générer si nécessaire
-    if "synthetic" in input_file and not os.path.exists(input_file):
-        logger.info("Génération de données synthétiques...")
-        synthetic_data = generate_synthetic_data(365)  # Générer un an de données
-        input_file = save_processed_data(synthetic_data, os.path.dirname(input_file), os.path.basename(input_file))
-        data = synthetic_data
+    # Vérifier si on doit générer des données synthétiques
+    if "synthetic" in input_file:
+        logger.info("Utilisation de données synthétiques...")
+        data = generate_synthetic_data(365)  # Générer un an de données
+        
+        # Sauvegarder les données synthétiques
+        save_processed_data(data, output_dir, "synthetic_hospital_data.csv")
     else:
-        # Préparation des données normales
-        data = prepare_data(input_file, output_dir)
+        # Préparation des données réelles
+        try:
+            data = prepare_data(input_file, output_dir)
+        except Exception as e:
+            logger.error(f"Erreur lors du prétraitement des données réelles: {str(e)}")
+            logger.info("Utilisation de données synthétiques comme fallback...")
+            data = generate_synthetic_data(365)
+            save_processed_data(data, output_dir, "synthetic_hospital_data.csv")
 
     # Entraînement du modèle
-    if optimize:
-        logger.info("Optimisation des hyperparamètres activée.")
-        model, metrics, _ = train_full_hospital_model(data, optimize_params=True)
-    elif cross_validation:
-        logger.info("Validation croisée activée.")
-        metrics_by_fold, metrics = train_with_cross_validation(data)
-        model, _, _ = train_full_hospital_model(data)  # Entraîner le modèle final
-    else:
-        model, metrics, _ = train_full_hospital_model(data)
+    try:
+        if optimize:
+            logger.info("Optimisation des hyperparamètres activée.")
+            model, metrics, _ = train_full_hospital_model(data, optimize_params=True)
+        elif cross_validation:
+            logger.info("Validation croisée activée.")
+            metrics_by_fold, metrics = train_with_cross_validation(data)
+            model, metrics, _ = train_full_hospital_model(data)  # Entraîner le modèle final
+        else:
+            model, metrics, _ = train_full_hospital_model(data)
 
-    # Sauvegarde des résultats
-    training_results = {
-        'metrics': metrics,
-        'timestamp': datetime.now().isoformat()
-    }
+        # Sauvegarde des résultats
+        training_results = {
+            'metrics': metrics,
+            'timestamp': datetime.now().isoformat()
+        }
 
-    # Assurer que le répertoire existe
-    os.makedirs(model_dir, exist_ok=True)
-    
-    result_path = os.path.join(model_dir, 'training_results.json')
-    with open(result_path, 'w') as f:
-        json.dump(training_results, f, indent=4)
+        # Assurer que le répertoire existe
+        os.makedirs(model_dir, exist_ok=True)
+        
+        result_path = os.path.join(model_dir, 'training_results.json')
+        with open(result_path, 'w') as f:
+            json.dump(training_results, f, indent=4)
 
-    logger.info(f"Entraînement terminé avec succès, résultats sauvegardés dans {model_dir}")
+        logger.info(f"Entraînement terminé avec succès, résultats sauvegardés dans {model_dir}")
+    except Exception as e:
+        logger.error(f"Erreur lors de l'entraînement du modèle: {str(e)}")
+        raise
 
 
 def main():
@@ -108,11 +119,18 @@ def main():
     parser.add_argument('--output-dir', default='data/processed')
     parser.add_argument('--optimize', action='store_true')
     parser.add_argument('--cross-validation', action='store_true')
+    parser.add_argument('--use-synthetic', action='store_true', help='Force l\'utilisation de données synthétiques')
 
     args = parser.parse_args()
 
+    # Si l'option --use-synthetic est activée, on ignore le fichier d'entrée
+    if args.use_synthetic:
+        input_file = "synthetic"
+    else:
+        input_file = args.data_file
+
     train_model(
-        input_file=args.data_file,
+        input_file=input_file,
         model_dir=args.model_dir,
         output_dir=args.output_dir,
         optimize=args.optimize,
