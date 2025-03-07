@@ -1,6 +1,7 @@
 # src/scripts/generate_predictions.py
 
 import os
+import sys
 import argparse
 import logging
 import json
@@ -9,12 +10,11 @@ from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
 
+# Ajout correct et robuste de la racine du projet au sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 # Import des modules locaux
-import sys
-sys.path.append('.')
-
-from hospital_prediction.predict import (
+from src.hospital_prediction.predict import (
     load_prediction_model,
     generate_predictions,
     visualize_predictions
