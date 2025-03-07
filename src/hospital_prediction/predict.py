@@ -87,15 +87,14 @@ def generate_predictions(
             historical_data['dayOfMonth'] = historical_data['date'].dt.day
         if 'year' not in historical_data.columns:
             historical_data['year'] = historical_data['date'].dt.year
+    # La colonne 'date' devrait être présente ; sinon, elle sera ajoutée en amont dans predict_daily_admissions.
     
     # Vérifier si la colonne 'avgOccupancyRate' existe
-    # (Nécessaire pour la génération de lags dans predict_future)
     if 'avgOccupancyRate' not in historical_data.columns:
         logger.warning("Colonne 'avgOccupancyRate' manquante. Ajout avec une valeur par défaut (75).")
         historical_data['avgOccupancyRate'] = 75
     
     # Vérifier si la colonne 'totalAdmissions' existe
-    # (Nécessaire si votre modèle attend aussi cette colonne pour les lags)
     if 'totalAdmissions' not in historical_data.columns:
         logger.warning("Colonne 'totalAdmissions' manquante. Ajout avec une valeur par défaut (50).")
         historical_data['totalAdmissions'] = 50
@@ -139,18 +138,12 @@ def generate_predictions(
     
     # Sauvegarder les prédictions si un répertoire est spécifié
     if output_dir:
-        # Créer le répertoire s'il n'existe pas
         os.makedirs(output_dir, exist_ok=True)
-        
-        # Générer un nom de fichier unique
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        
-        # Sauvegarder les prédictions
         predictions_file = os.path.join(output_dir, f'predictions_{timestamp}.csv')
         future_predictions.to_csv(predictions_file, index=False)
         logger.info(f"Prédictions sauvegardées dans {predictions_file}")
         
-        # Sauvegarder les alertes
         import json
         alerts_file = os.path.join(output_dir, f'alerts_{timestamp}.json')
         with open(alerts_file, 'w') as f:
@@ -206,7 +199,6 @@ def visualize_predictions(
         future_days=len(future_predictions)
     )
     
-    # Sauvegarder la figure si un répertoire est spécifié
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -245,9 +237,12 @@ def predict_daily_admissions(
     else:
         raise ValueError(f"Format de fichier non supporté: {data_path}")
     
-    # Convertir la colonne de date si nécessaire
+    # Si la colonne 'date' est absente, la générer par défaut
     if 'date' in historical_data.columns:
         historical_data['date'] = pd.to_datetime(historical_data['date'])
+    else:
+        logger.warning("Colonne 'date' manquante dans les données historiques. Génération d'une colonne 'date' par défaut.")
+        historical_data['date'] = pd.date_range(end=datetime.now(), periods=len(historical_data), freq='D')
     
     # Charger le modèle
     model = load_prediction_model(model_path)
