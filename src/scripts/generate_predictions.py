@@ -58,8 +58,13 @@ def prepare_input_data(data_path: str) -> pd.DataFrame:
             raise ValueError(f"Format de fichier non supporté ou données introuvables: {data_path}")
     
     # Convertir la colonne de date si nécessaire
+    # Dans prepare_input_data, après avoir chargé les données
     if 'date' in historical_data.columns:
         historical_data['date'] = pd.to_datetime(historical_data['date'])
+    
+        # Ajouter explicitement les colonnes manquantes dayOfMonth et year
+        historical_data['dayOfMonth'] = historical_data['date'].dt.day
+        historical_data['year'] = historical_data['date'].dt.year
     
     return historical_data
 

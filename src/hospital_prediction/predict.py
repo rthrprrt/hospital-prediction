@@ -79,6 +79,24 @@ def generate_predictions(
     """
     logger.info(f"Génération de prédictions pour {prediction_days} jours")
     
+    # S'assurer que les colonnes requises sont présentes
+    if 'date' in historical_data.columns:
+        if 'dayOfMonth' not in historical_data.columns:
+            historical_data['dayOfMonth'] = historical_data['date'].dt.day
+        if 'year' not in historical_data.columns:
+            historical_data['year'] = historical_data['date'].dt.year
+    
+    # Vérifier que toutes les colonnes requises par le modèle sont présentes
+    required_features = model.feature_names if model.feature_names else []
+    missing_features = [feat for feat in required_features if feat not in historical_data.columns]
+    
+    if missing_features:
+        logger.warning(f"Colonnes manquantes dans les données: {missing_features}")
+        # Ajouter les colonnes manquantes avec des valeurs par défaut
+        for feat in missing_features:
+            historical_data[feat] = 0
+            logger.warning(f"Ajout de la colonne '{feat}' avec des valeurs par défaut (0)")
+    
     # Faire les prédictions futures
     future_predictions = model.predict_future(historical_data, days=prediction_days)
     
