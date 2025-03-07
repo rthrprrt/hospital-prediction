@@ -59,13 +59,13 @@ def prepare_data(input_file: str, output_dir: str = 'data/processed') -> pd.Data
     return daily_data
 
 
-def train_model(input_file: str, model_dir: str = 'models', output_dir: str = 'data/processed',
-                optimize: bool = False, cross_validation: bool = False):
+def train_model(input_file: str = None, model_dir: str = 'models', output_dir: str = 'data/processed',
+                optimize: bool = False, cross_validation: bool = False, use_synthetic: bool = False):
 
     logger.info("Démarrage de l'entraînement du modèle...")
 
     # Vérifier si on doit générer des données synthétiques
-    if "synthetic" in input_file:
+    if use_synthetic or input_file is None:
         logger.info("Utilisation de données synthétiques...")
         data = generate_synthetic_data(365)  # Générer un an de données
         
@@ -114,7 +114,7 @@ def train_model(input_file: str, model_dir: str = 'models', output_dir: str = 'd
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-file', required=True, help='Chemin du fichier de données brutes (Excel ou CSV)')
+    parser.add_argument('--data-file', help='Chemin du fichier de données brutes (Excel ou CSV)')
     parser.add_argument('--model-dir', default='models/')
     parser.add_argument('--output-dir', default='data/processed')
     parser.add_argument('--optimize', action='store_true')
@@ -123,18 +123,17 @@ def main():
 
     args = parser.parse_args()
 
-    # Si l'option --use-synthetic est activée, on ignore le fichier d'entrée
-    if args.use_synthetic:
-        input_file = "synthetic"
-    else:
-        input_file = args.data_file
+    # Vérifier si --data-file est fourni lorsque --use-synthetic n'est pas utilisé
+    if not args.use_synthetic and args.data_file is None:
+        parser.error("--data-file est requis sauf si --use-synthetic est spécifié")
 
     train_model(
-        input_file=input_file,
+        input_file=args.data_file,
         model_dir=args.model_dir,
         output_dir=args.output_dir,
         optimize=args.optimize,
-        cross_validation=args.cross_validation
+        cross_validation=args.cross_validation,
+        use_synthetic=args.use_synthetic
     )
 
 
