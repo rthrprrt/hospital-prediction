@@ -5,7 +5,7 @@ import sys
 import argparse
 import logging
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -32,6 +32,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger('hospital_prediction.generate_predictions')
 
+
 def prepare_input_data(data_path: str) -> pd.DataFrame:
     """
     Prépare les données d'entrée pour la génération de prédictions
@@ -57,16 +58,22 @@ def prepare_input_data(data_path: str) -> pd.DataFrame:
             logger.error(f"Impossible de charger les données: {str(e)}")
             raise ValueError(f"Format de fichier non supporté ou données introuvables: {data_path}")
     
+    # Vérifier si la colonne 'date' est présente
+    if 'date' not in historical_data.columns:
+        logger.warning("Colonne 'date' absente. Génération d'une colonne 'date' par défaut.")
+        historical_data['date'] = pd.date_range(end=datetime.now(), periods=len(historical_data), freq='D')
+    
     # Convertir la colonne de date si nécessaire
-    # Dans prepare_input_data, après avoir chargé les données
     if 'date' in historical_data.columns:
         historical_data['date'] = pd.to_datetime(historical_data['date'])
-    
         # Ajouter explicitement les colonnes manquantes dayOfMonth et year
-        historical_data['dayOfMonth'] = historical_data['date'].dt.day
-        historical_data['year'] = historical_data['date'].dt.year
+        if 'dayOfMonth' not in historical_data.columns:
+            historical_data['dayOfMonth'] = historical_data['date'].dt.day
+        if 'year' not in historical_data.columns:
+            historical_data['year'] = historical_data['date'].dt.year
     
     return historical_data
+
 
 def run_predictions(
     data_path: str, 
@@ -143,6 +150,7 @@ def run_predictions(
     
     return prediction_results
 
+
 def main():
     """
     Point d'entrée principal pour la génération de prédictions
@@ -218,6 +226,7 @@ def main():
     except Exception as e:
         logger.error(f"Erreur lors de la génération des prédictions : {str(e)}")
         print(f"Erreur : {str(e)}")
+
 
 # Point d'entrée du script
 if __name__ == "__main__":
