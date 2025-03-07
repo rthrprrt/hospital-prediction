@@ -16,7 +16,9 @@ from src.hospital_prediction.data_processor import (
     load_data_from_excel, 
     load_data_from_csv, 
     preprocess_hospital_data, 
-    save_processed_data
+    save_processed_data,
+    aggregate_daily_data,
+    generate_synthetic_data
 )
 from src.hospital_prediction.train import (
     train_full_hospital_model,
@@ -62,22 +64,26 @@ def train_model(input_file: str, model_dir: str = 'models', output_dir: str = 'd
 
     logger.info("Démarrage de l'entraînement du modèle...")
 
-    # Préparation des données
-    data = prepare_data(input_file, output_dir)
+    # Vérifier si le fichier est "synthetic" et le générer si nécessaire
+    if "synthetic" in input_file and not os.path.exists(input_file):
+        logger.info("Génération de données synthétiques...")
+        synthetic_data = generate_synthetic_data(365)  # Générer un an de données
+        input_file = save_processed_data(synthetic_data, os.path.dirname(input_file), os.path.basename(input_file))
+        data = synthetic_data
+    else:
+        # Préparation des données normales
+        data = prepare_data(input_file, output_dir)
 
     # Entraînement du modèle
     if optimize:
         logger.info("Optimisation des hyperparamètres activée.")
-        model, metrics = optimize_model_parameters(data)
+        model, metrics, _ = train_full_hospital_model(data, optimize_params=True)
     elif cross_validation:
         logger.info("Validation croisée activée.")
-        model, metrics = train_with_cross_validation(data)
+        metrics_by_fold, metrics = train_with_cross_validation(data)
+        model, _, _ = train_full_hospital_model(data)  # Entraîner le modèle final
     else:
-        model, metrics = train_full_hospital_model(data)
-
-    # Sauvegarde des modèles entraînés
-    os.makedirs(model_dir, exist_ok=True)
-    model.save_model(model_dir)
+        model, metrics, _ = train_full_hospital_model(data)
 
     # Sauvegarde des résultats
     training_results = {
@@ -85,16 +91,17 @@ def train_model(input_file: str, model_dir: str = 'models', output_dir: str = 'd
         'timestamp': datetime.now().isoformat()
     }
 
+    # Assurer que le répertoire existe
+    os.makedirs(model_dir, exist_ok=True)
+    
     result_path = os.path.join(model_dir, 'training_results.json')
-    with open(result_file, 'w') as f:
-        json.dump(metrics, f, indent=4)
+    with open(result_path, 'w') as f:
+        json.dump(training_results, f, indent=4)
 
     logger.info(f"Entraînement terminé avec succès, résultats sauvegardés dans {model_dir}")
 
 
 def main():
-    import argparse
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--data-file', required=True, help='Chemin du fichier de données brutes (Excel ou CSV)')
     parser.add_argument('--model-dir', default='models/')
