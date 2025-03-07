@@ -307,163 +307,163 @@ class HospitalPredictionModel:
         
         return y_pred_admissions, y_pred_occupancy, alerts
     
-def predict_future(self, last_data, days=30):
-    """
-    Prédire les admissions et le taux d'occupation pour les jours futurs
-    
-    Args:
-        last_data: Dernières données connues (DataFrame)
-        days: Nombre de jours à prédire dans le futur
+    def predict_future(self, last_data, days=30):
+        """
+        Prédire les admissions et le taux d'occupation pour les jours futurs
         
-    Returns:
-        DataFrame contenant les prédictions pour les jours futurs
-    """
-    if self.admission_model is None or self.occupancy_model is None:
-        raise ValueError("Les modèles doivent être entraînés avant de faire des prédictions")
+        Args:
+            last_data: Dernières données connues (DataFrame)
+            days: Nombre de jours à prédire dans le futur
+            
+        Returns:
+            DataFrame contenant les prédictions pour les jours futurs
+        """
+        if self.admission_model is None or self.occupancy_model is None:
+            raise ValueError("Les modèles doivent être entraînés avant de faire des prédictions")
+            
+        logger.info(f"Prédiction pour les {days} prochains jours")
         
-    logger.info(f"Prédiction pour les {days} prochains jours")
-    
-    # Assurer que last_data est un DataFrame
-    last_data = pd.DataFrame(last_data) if not isinstance(last_data, pd.DataFrame) else last_data.copy()
-    
-    # S'assurer que toutes les colonnes nécessaires sont présentes
-    if 'date' in last_data.columns:
-        if 'dayOfMonth' not in last_data.columns:
-            last_data['dayOfMonth'] = last_data['date'].dt.day
-        if 'year' not in last_data.columns:
-            last_data['year'] = last_data['date'].dt.year
-    
-    # Vérifier si toutes les colonnes du modèle sont présentes
-    if self.feature_names:
-        for feature in self.feature_names:
-            if feature not in last_data.columns:
-                logger.warning(f"Colonne '{feature}' manquante, ajout d'une valeur par défaut")
-                # Ajouter une valeur par défaut selon le type de feature
-                if feature in ['month', 'dayOfMonth', 'dayOfWeek', 'year']:
-                    last_data[feature] = 1
-                elif feature.startswith('is'):
-                    last_data[feature] = 0
-                else:
-                    last_data[feature] = last_data.get('totalAdmissions', 80) if 'admissions' in feature else last_data.get('avgOccupancyRate', 75)
-    
-    # Trier par date et prendre les dernières entrées nécessaires
-    if 'date' in last_data.columns:
-        last_data = last_data.sort_values('date')
-    
-    # Préparer le DataFrame pour les prédictions futures
-    future_data = []
-    
-    # Dernière date connue
-    last_date = pd.to_datetime(last_data['date'].iloc[-1]) if 'date' in last_data.columns else datetime.now()
-    
-    # Pour chaque jour futur
-    for i in range(1, days + 1):
-        future_date = last_date + timedelta(days=i)
+        # Assurer que last_data est un DataFrame
+        last_data = pd.DataFrame(last_data) if not isinstance(last_data, pd.DataFrame) else last_data.copy()
         
-        # Créer une nouvelle entrée avec les caractéristiques de base
-        new_entry = {
-            'date': future_date,
-            'year': future_date.year,
-            'month': future_date.month,
-            'dayOfMonth': future_date.day,
-            'dayOfWeek': future_date.weekday(),
-            'isWeekend': 1 if future_date.weekday() >= 5 else 0,
-            'isSummer': 1 if future_date.month in [6, 7, 8] else 0,
-            'isWinter': 1 if future_date.month in [12, 1, 2] else 0,
-            'isSpring': 1 if future_date.month in [3, 4, 5] else 0,
-            'isFall': 1 if future_date.month in [9, 10, 11] else 0,
-        }
+        # S'assurer que toutes les colonnes nécessaires sont présentes
+        if 'date' in last_data.columns:
+            if 'dayOfMonth' not in last_data.columns:
+                last_data['dayOfMonth'] = last_data['date'].dt.day
+            if 'year' not in last_data.columns:
+                last_data['year'] = last_data['date'].dt.year
         
-        # Si c'est le premier jour de prédiction, utiliser les valeurs des dernières données connues
-        if i == 1:
-            # Occupancy lags (utiliser les dernières valeurs connues ou prédites)
-            new_entry['occupancyLag1'] = float(last_data['avgOccupancyRate'].iloc[-1])
-            new_entry['occupancyLag3'] = float(last_data['avgOccupancyRate'].iloc[-3]) if len(last_data) >= 3 else new_entry['occupancyLag1']
-            new_entry['occupancyLag7'] = float(last_data['avgOccupancyRate'].iloc[-7]) if len(last_data) >= 7 else new_entry['occupancyLag1']
-            
-            # Admission lags
-            new_entry['admissionsLag1'] = float(last_data['totalAdmissions'].iloc[-1])
-            new_entry['admissionsLag3'] = float(last_data['totalAdmissions'].iloc[-3]) if len(last_data) >= 3 else new_entry['admissionsLag1']
-            new_entry['admissionsLag7'] = float(last_data['totalAdmissions'].iloc[-7]) if len(last_data) >= 7 else new_entry['admissionsLag1']
-            
-            # Moyennes mobiles
-            window_size = min(7, len(last_data))
-            new_entry['admissionsMA7'] = float(last_data['totalAdmissions'].iloc[-window_size:].mean())
-            new_entry['occupancyMA7'] = float(last_data['avgOccupancyRate'].iloc[-window_size:].mean())
-        else:
-            # Utiliser les prédictions précédentes pour les lags
-            prev_entries = future_data[-min(i-1, 7):]
-            prev_df = pd.DataFrame(prev_entries)
-            
-            # Occupancy lags
-            new_entry['occupancyLag1'] = prev_df['predicted_occupancy'].iloc[-1] if len(prev_df) >= 1 else new_entry.get('occupancyLag1', 75.0)
-            new_entry['occupancyLag3'] = prev_df['predicted_occupancy'].iloc[-3] if len(prev_df) >= 3 else new_entry.get('occupancyLag1', 75.0)
-            new_entry['occupancyLag7'] = prev_df['predicted_occupancy'].iloc[-7] if len(prev_df) >= 7 else new_entry.get('occupancyLag1', 75.0)
-            
-            # Admission lags
-            new_entry['admissionsLag1'] = prev_df['predicted_admissions'].iloc[-1] if len(prev_df) >= 1 else new_entry.get('admissionsLag1', 1.0)
-            new_entry['admissionsLag3'] = prev_df['predicted_admissions'].iloc[-3] if len(prev_df) >= 3 else new_entry.get('admissionsLag1', 1.0)
-            new_entry['admissionsLag7'] = prev_df['predicted_admissions'].iloc[-7] if len(prev_df) >= 7 else new_entry.get('admissionsLag1', 1.0)
-            
-            # Moyennes mobiles (combiner les données réelles et prédites si nécessaire)
-            admissions_values = list(prev_df['predicted_admissions'])
-            occupancy_values = list(prev_df['predicted_occupancy'])
-            
-            if len(admissions_values) < 7 and 'totalAdmissions' in last_data.columns:
-                # Compléter avec des données réelles si disponibles
-                additional_values = last_data['totalAdmissions'].iloc[-(7-len(admissions_values)):].tolist()
-                admissions_values = additional_values + admissions_values
-            
-            if len(occupancy_values) < 7 and 'avgOccupancyRate' in last_data.columns:
-                # Compléter avec des données réelles si disponibles
-                additional_values = last_data['avgOccupancyRate'].iloc[-(7-len(occupancy_values)):].tolist()
-                occupancy_values = additional_values + occupancy_values
-            
-            # Calculer les moyennes mobiles
-            new_entry['admissionsMA7'] = sum(admissions_values[-min(7, len(admissions_values)):]) / min(7, len(admissions_values))
-            new_entry['occupancyMA7'] = sum(occupancy_values[-min(7, len(occupancy_values)):]) / min(7, len(occupancy_values))
+        # Vérifier si toutes les colonnes du modèle sont présentes
+        if self.feature_names:
+            for feature in self.feature_names:
+                if feature not in last_data.columns:
+                    logger.warning(f"Colonne '{feature}' manquante, ajout d'une valeur par défaut")
+                    # Ajouter une valeur par défaut selon le type de feature
+                    if feature in ['month', 'dayOfMonth', 'dayOfWeek', 'year']:
+                        last_data[feature] = 1
+                    elif feature.startswith('is'):
+                        last_data[feature] = 0
+                    else:
+                        last_data[feature] = last_data.get('totalAdmissions', 80) if 'admissions' in feature else last_data.get('avgOccupancyRate', 75)
         
-        # Extraire les features pertinentes pour la prédiction
-        # Créer un dict avec toutes les features requises
-        prediction_features = {}
+        # Trier par date et prendre les dernières entrées nécessaires
+        if 'date' in last_data.columns:
+            last_data = last_data.sort_values('date')
         
-        # Ajouter les features de base avec des valeurs par défaut
-        for feature in self.feature_names:
-            if feature in new_entry:
-                prediction_features[feature] = new_entry[feature]
+        # Préparer le DataFrame pour les prédictions futures
+        future_data = []
+        
+        # Dernière date connue
+        last_date = pd.to_datetime(last_data['date'].iloc[-1]) if 'date' in last_data.columns else datetime.now()
+        
+        # Pour chaque jour futur
+        for i in range(1, days + 1):
+            future_date = last_date + timedelta(days=i)
+            
+            # Créer une nouvelle entrée avec les caractéristiques de base
+            new_entry = {
+                'date': future_date,
+                'year': future_date.year,
+                'month': future_date.month,
+                'dayOfMonth': future_date.day,
+                'dayOfWeek': future_date.weekday(),
+                'isWeekend': 1 if future_date.weekday() >= 5 else 0,
+                'isSummer': 1 if future_date.month in [6, 7, 8] else 0,
+                'isWinter': 1 if future_date.month in [12, 1, 2] else 0,
+                'isSpring': 1 if future_date.month in [3, 4, 5] else 0,
+                'isFall': 1 if future_date.month in [9, 10, 11] else 0,
+            }
+            
+            # Si c'est le premier jour de prédiction, utiliser les valeurs des dernières données connues
+            if i == 1:
+                # Occupancy lags (utiliser les dernières valeurs connues ou prédites)
+                new_entry['occupancyLag1'] = float(last_data['avgOccupancyRate'].iloc[-1])
+                new_entry['occupancyLag3'] = float(last_data['avgOccupancyRate'].iloc[-3]) if len(last_data) >= 3 else new_entry['occupancyLag1']
+                new_entry['occupancyLag7'] = float(last_data['avgOccupancyRate'].iloc[-7]) if len(last_data) >= 7 else new_entry['occupancyLag1']
+                
+                # Admission lags
+                new_entry['admissionsLag1'] = float(last_data['totalAdmissions'].iloc[-1])
+                new_entry['admissionsLag3'] = float(last_data['totalAdmissions'].iloc[-3]) if len(last_data) >= 3 else new_entry['admissionsLag1']
+                new_entry['admissionsLag7'] = float(last_data['totalAdmissions'].iloc[-7]) if len(last_data) >= 7 else new_entry['admissionsLag1']
+                
+                # Moyennes mobiles
+                window_size = min(7, len(last_data))
+                new_entry['admissionsMA7'] = float(last_data['totalAdmissions'].iloc[-window_size:].mean())
+                new_entry['occupancyMA7'] = float(last_data['avgOccupancyRate'].iloc[-window_size:].mean())
             else:
-                # Valeur par défaut selon le type de feature
-                if feature in ['month', 'dayOfMonth', 'dayOfWeek', 'year']:
-                    prediction_features[feature] = 1
-                elif feature.startswith('is'):
-                    prediction_features[feature] = 0
+                # Utiliser les prédictions précédentes pour les lags
+                prev_entries = future_data[-min(i-1, 7):]
+                prev_df = pd.DataFrame(prev_entries)
+                
+                # Occupancy lags
+                new_entry['occupancyLag1'] = prev_df['predicted_occupancy'].iloc[-1] if len(prev_df) >= 1 else new_entry.get('occupancyLag1', 75.0)
+                new_entry['occupancyLag3'] = prev_df['predicted_occupancy'].iloc[-3] if len(prev_df) >= 3 else new_entry.get('occupancyLag1', 75.0)
+                new_entry['occupancyLag7'] = prev_df['predicted_occupancy'].iloc[-7] if len(prev_df) >= 7 else new_entry.get('occupancyLag1', 75.0)
+                
+                # Admission lags
+                new_entry['admissionsLag1'] = prev_df['predicted_admissions'].iloc[-1] if len(prev_df) >= 1 else new_entry.get('admissionsLag1', 1.0)
+                new_entry['admissionsLag3'] = prev_df['predicted_admissions'].iloc[-3] if len(prev_df) >= 3 else new_entry.get('admissionsLag1', 1.0)
+                new_entry['admissionsLag7'] = prev_df['predicted_admissions'].iloc[-7] if len(prev_df) >= 7 else new_entry.get('admissionsLag1', 1.0)
+                
+                # Moyennes mobiles (combiner les données réelles et prédites si nécessaire)
+                admissions_values = list(prev_df['predicted_admissions'])
+                occupancy_values = list(prev_df['predicted_occupancy'])
+                
+                if len(admissions_values) < 7 and 'totalAdmissions' in last_data.columns:
+                    # Compléter avec des données réelles si disponibles
+                    additional_values = last_data['totalAdmissions'].iloc[-(7-len(admissions_values)):].tolist()
+                    admissions_values = additional_values + admissions_values
+                
+                if len(occupancy_values) < 7 and 'avgOccupancyRate' in last_data.columns:
+                    # Compléter avec des données réelles si disponibles
+                    additional_values = last_data['avgOccupancyRate'].iloc[-(7-len(occupancy_values)):].tolist()
+                    occupancy_values = additional_values + occupancy_values
+                
+                # Calculer les moyennes mobiles
+                new_entry['admissionsMA7'] = sum(admissions_values[-min(7, len(admissions_values)):]) / min(7, len(admissions_values))
+                new_entry['occupancyMA7'] = sum(occupancy_values[-min(7, len(occupancy_values)):]) / min(7, len(occupancy_values))
+            
+            # Extraire les features pertinentes pour la prédiction
+            # Créer un dict avec toutes les features requises
+            prediction_features = {}
+            
+            # Ajouter les features de base avec des valeurs par défaut
+            for feature in self.feature_names:
+                if feature in new_entry:
+                    prediction_features[feature] = new_entry[feature]
                 else:
-                    prediction_features[feature] = 75 if 'occupancy' in feature else 80
+                    # Valeur par défaut selon le type de feature
+                    if feature in ['month', 'dayOfMonth', 'dayOfWeek', 'year']:
+                        prediction_features[feature] = 1
+                    elif feature.startswith('is'):
+                        prediction_features[feature] = 0
+                    else:
+                        prediction_features[feature] = 75 if 'occupancy' in feature else 80
+            
+            X_future = pd.DataFrame([prediction_features])
+            
+            # Faire les prédictions
+            predicted_admissions = float(self.admission_model.predict(X_future)[0])
+            predicted_occupancy = float(self.occupancy_model.predict(X_future)[0])
+            
+            # Ajouter les prédictions à l'entrée
+            new_entry['predicted_admissions'] = predicted_admissions
+            new_entry['predicted_occupancy'] = predicted_occupancy
+            
+            # Vérifier si une alerte doit être générée
+            new_entry['admission_alert'] = predicted_admissions >= self.admission_threshold
+            new_entry['occupancy_alert'] = predicted_occupancy >= self.occupancy_threshold
+            
+            # Ajouter l'entrée aux données futures
+            future_data.append(new_entry)
         
-        X_future = pd.DataFrame([prediction_features])
+        # Convertir en DataFrame
+        future_df = pd.DataFrame(future_data)
         
-        # Faire les prédictions
-        predicted_admissions = float(self.admission_model.predict(X_future)[0])
-        predicted_occupancy = float(self.occupancy_model.predict(X_future)[0])
-        
-        # Ajouter les prédictions à l'entrée
-        new_entry['predicted_admissions'] = predicted_admissions
-        new_entry['predicted_occupancy'] = predicted_occupancy
-        
-        # Vérifier si une alerte doit être générée
-        new_entry['admission_alert'] = predicted_admissions >= self.admission_threshold
-        new_entry['occupancy_alert'] = predicted_occupancy >= self.occupancy_threshold
-        
-        # Ajouter l'entrée aux données futures
-        future_data.append(new_entry)
+        logger.info(f"Prédictions générées pour la période du {future_df['date'].min().strftime('%Y-%m-%d')} au {future_df['date'].max().strftime('%Y-%m-%d')}")
+        return future_df
     
-    # Convertir en DataFrame
-    future_df = pd.DataFrame(future_data)
-    
-    logger.info(f"Prédictions générées pour la période du {future_df['date'].min().strftime('%Y-%m-%d')} au {future_df['date'].max().strftime('%Y-%m-%d')}")
-    return future_df
-    
-def save(self, filename_prefix=None):
+    def save(self, filename_prefix=None):
         """
         Sauvegarder les modèles entraînés
         
@@ -513,7 +513,7 @@ def save(self, filename_prefix=None):
             'metadata': metadata_path
         }
     
-def load(self, admission_model_path, occupancy_model_path, metadata_path=None):
+    def load(self, admission_model_path, occupancy_model_path, metadata_path=None):
         """
         Charger des modèles entraînés
         
@@ -543,7 +543,7 @@ def load(self, admission_model_path, occupancy_model_path, metadata_path=None):
         
         logger.info("Modèles chargés avec succès")
     
-def plot_feature_importance(self, model_type='both', top_n=10):
+    def plot_feature_importance(self, model_type='both', top_n=10):
         """
         Visualiser l'importance des features
         
@@ -588,7 +588,7 @@ def plot_feature_importance(self, model_type='both', top_n=10):
                 
                 features, importances = zip(*sorted_features)
                 
-                ax2.barh(range(len(features)), importances, align='center')
+                ax2.barh(range(len(features)),ax2.barh(range(len(features)), importances, align='center')
                 ax2.set_yticks(range(len(features)))
                 ax2.set_yticklabels(features)
                 ax2.set_title("Importance des features - Modèle de taux d'occupation")
@@ -620,7 +620,7 @@ def plot_feature_importance(self, model_type='both', top_n=10):
         
         return fig
     
-def plot_predictions(self, X, y_true_admissions=None, y_true_occupancy=None, dates=None, future_days=0):
+    def plot_predictions(self, X, y_true_admissions=None, y_true_occupancy=None, dates=None, future_days=0):
         """
         Visualiser les prédictions par rapport aux valeurs réelles
         
@@ -724,7 +724,7 @@ def plot_predictions(self, X, y_true_admissions=None, y_true_occupancy=None, dat
         
         return fig
     
-def get_seasonal_patterns(self, df, target_col_admissions, target_col_occupancy):
+    def get_seasonal_patterns(self, df, target_col_admissions, target_col_occupancy):
         """
         Analyser les motifs saisonniers dans les données
         
@@ -859,3 +859,4 @@ def predict_future_admissions(model, last_data, days=30):
     future_df = model.predict_future(last_data, days)
     
     return future_df
+                         
