@@ -149,6 +149,7 @@ python -m src.scripts.validate_model \
     --output-dir validation_results
 ```
 
+```bash
 # Avec Docker
 docker run --entrypoint python \
   -v "$PWD/data:/app/data" \
@@ -158,6 +159,7 @@ docker run --entrypoint python \
   --model-path "/app/models" \
   --data-file "/app/data/processed/test_data.csv" \
   --output-dir "/app/validation_results"
+```
 
 ## 📊 Métriques et Performances
 
