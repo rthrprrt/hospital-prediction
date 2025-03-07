@@ -27,30 +27,30 @@ Ce projet vise à développer un modèle de machine learning avancé pour prédi
 ## 📂 Structure du Projet
 
 ```
-hospital-prediction/
-├── Dockerfile                     # Configuration du conteneur Docker
-├── docker-compose.yml             # Configuration multi-conteneurs
-├── .dockerignore                  # Fichiers ignorés par Docker
-├── requirements.txt               # Dépendances Python
+HOPITAL-PREDICTION/
 ├── data/                          # Données
 │   ├── raw/                       # Données brutes
 │   └── processed/                 # Données prétraitées
+├── logs/                          # Journaux d'exécution
 ├── models/                        # Modèles entraînés
 ├── predictions/                   # Prédictions générées
-├── logs/                          # Journaux d'exécution
-└── src/                           # Code source
-    ├── hospital_prediction/       # Package principal
-    │   ├── model.py               # Classe du modèle de prédiction
-    │   ├── data_processor.py      # Prétraitement des données
-    │   ├── train.py               # Fonctions d'entraînement
-    │   └── predict.py             # Fonctions de prédiction
-    ├── utils/                     # Utilitaires
-    │   ├── visualization.py       # Fonctions de visualisation
-    │   └── metrics.py             # Métriques de performance
-    └── scripts/                   # Scripts exécutables
-        ├── train_model.py         # Script d'entraînement
-        ├── generate_predictions.py# Script de génération de prédictions
-        └── validate_model.py      # Script de validation du modèle
+├── src/
+│   ├── hospital_prediction/       # Package principal
+│   │   ├── model.py               # Classe du modèle de prédiction
+│   │   ├── data_processor.py      # Prétraitement des données
+│   │   ├── train.py               # Fonctions d'entraînement
+│   │   └── predict.py             # Fonctions de prédiction
+│   ├── scripts/                   # Scripts exécutables
+│   │   ├── train_model.py         # Script d'entraînement
+│   │   ├── generate_predictions.py# Script de génération de prédictions
+│   │   └── validate_model.py      # Script de validation du modèle
+│   └── utils/                     # Utilitaires
+│       ├── visualization.py       # Fonctions de visualisation
+│       └── metrics.py             # Métriques de performance
+├── docker-compose.yml             # Configuration multi-conteneurs (optionnel)
+├── Dockerfile                     # Configuration du conteneur Docker
+├── requirements.txt               # Dépendances Python
+└── README.md                      # Documentation du projet
 ```
 
 ## 🚀 Installation et Configuration
@@ -106,7 +106,14 @@ python -m src.scripts.train_model \
     --optimize
 
 # Avec Docker
-docker-compose run train
+docker run --entrypoint python \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/models:/app/models" \
+  hospital-prediction \
+  -m src.scripts.train_model \
+  --data-file "/app/data/raw/hospital_data.csv" \
+  --output-dir "/app/models" \
+  --test-size 0.2
 ```
 
 ### Génération de Prédictions
@@ -120,7 +127,16 @@ python -m src.scripts.generate_predictions \
     --days 30
 
 # Avec Docker
-docker-compose run predict
+docker run --entrypoint python \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/models:/app/models" \
+  -v "$PWD/predictions:/app/predictions" \
+  hospital-prediction \
+  -m src.scripts.generate_predictions \
+  --data-file "/app/data/processed/processed_data.csv" \
+  --model-dir "/app/models" \
+  --output-dir "/app/predictions" \
+  --days 7
 ```
 
 ### Validation du Modèle
@@ -133,6 +149,16 @@ python -m src.scripts.validate_model \
     --output-dir validation_results
 ```
 
+# Avec Docker
+docker run --entrypoint python \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/models:/app/models" \
+  hospital-prediction \
+  -m src.scripts.validate_model \
+  --model-path "/app/models" \
+  --data-file "/app/data/processed/test_data.csv" \
+  --output-dir "/app/validation_results"
+
 ## 📊 Métriques et Performances
 
 - Métriques de validation :
@@ -140,3 +166,17 @@ python -m src.scripts.validate_model \
   - Erreur Quadratique Moyenne (MSE)
   - Coefficient de Détermination (R²)
   - Erreur Absolue Pourcentage Moyenne (MAPE)
+
+## Questions Fréquentes (FAQ)
+Comment modifier les paramètres du modèle ?
+Les hyperparamètres sont définis dans src/hospital_prediction/model.py dans la méthode train().
+
+Comment adapter la période de prédiction ?
+Utilisez l’argument --days dans le script generate_predictions.py.
+
+Comment mettre à jour le modèle en production ?
+Re-construisez l’image Docker après chaque mise à jour du code source et utilisez un système de versioning pour vos modèles et métadonnées.
+
+Pourquoi y a-t-il des différences entre VS Code et GitHub ?
+Assurez-vous que toutes vos modifications locales sont bien commitées et poussées sur GitHub. Ce README mis à jour reflète la structure et l'utilisation actuelles du projet.
+
