@@ -161,6 +161,36 @@ docker run --entrypoint python \
   --output-dir "/app/validation_results"
 ```
 
+### Mise à jour des données et réentraînement du modèle
+
+Pour ajouter de nouvelles données et mettre à jour le modèle, suivez ces étapes :
+
+1. **Ajouter les données :**  
+   - Placez les nouvelles données brutes dans `data/raw/` ou les données prétraitées dans `data/processed/`.
+
+2. **Prétraitement :**  
+   - Exécutez le script de prétraitement pour générer le fichier prétraité (si nécessaire).
+
+3. **Réentraînement du modèle :**  
+   - Lancez le script d'entraînement pour réentraîner le modèle avec l'ensemble complet des données :
+     ```bash
+     python -m src.scripts.train_model \
+         --data-file "data/processed/processed_data.csv" \
+         --output-dir "models" \
+         --test-size 0.2
+     ```
+
+4. **Génération de prédictions :**  
+   - Utilisez le script de génération de prédictions avec le nouveau modèle :
+     ```bash
+     python -m src.scripts.generate_predictions \
+         --data-file "data/processed/processed_data.csv" \
+         --model-dir "models" \
+         --output-dir "predictions" \
+         --days 7
+     ```
+
+
 ## 📊 Métriques et Performances
 
 - Métriques de validation :
