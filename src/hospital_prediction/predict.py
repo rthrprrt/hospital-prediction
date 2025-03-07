@@ -8,7 +8,6 @@ from typing import Dict, List, Tuple, Optional, Union
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 
-
 # Import des modules locaux
 from src.hospital_prediction.model import HospitalPredictionModel
 from src.utils.visualization import plot_predictions, save_figure
@@ -19,6 +18,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger('hospital_prediction.predict')
+
 
 def load_prediction_model(model_path: str, metadata_path: Optional[str] = None) -> HospitalPredictionModel:
     """
@@ -59,6 +59,7 @@ def load_prediction_model(model_path: str, metadata_path: Optional[str] = None) 
     logger.info("Modèle de prédiction chargé avec succès")
     return model
 
+
 def generate_predictions(
     model: HospitalPredictionModel, 
     historical_data: pd.DataFrame, 
@@ -79,14 +80,27 @@ def generate_predictions(
     """
     logger.info(f"Génération de prédictions pour {prediction_days} jours")
     
-    # S'assurer que les colonnes requises sont présentes
+    # S'assurer que la colonne 'date' est au bon format
     if 'date' in historical_data.columns:
+        historical_data['date'] = pd.to_datetime(historical_data['date'])
         if 'dayOfMonth' not in historical_data.columns:
             historical_data['dayOfMonth'] = historical_data['date'].dt.day
         if 'year' not in historical_data.columns:
             historical_data['year'] = historical_data['date'].dt.year
     
-    # Vérifier que toutes les colonnes requises par le modèle sont présentes
+    # Vérifier si la colonne 'avgOccupancyRate' existe
+    # (Nécessaire pour la génération de lags dans predict_future)
+    if 'avgOccupancyRate' not in historical_data.columns:
+        logger.warning("Colonne 'avgOccupancyRate' manquante. Ajout avec une valeur par défaut (75).")
+        historical_data['avgOccupancyRate'] = 75
+    
+    # Vérifier si la colonne 'totalAdmissions' existe
+    # (Nécessaire si votre modèle attend aussi cette colonne pour les lags)
+    if 'totalAdmissions' not in historical_data.columns:
+        logger.warning("Colonne 'totalAdmissions' manquante. Ajout avec une valeur par défaut (50).")
+        historical_data['totalAdmissions'] = 50
+    
+    # Vérifier que toutes les features requises par le modèle sont présentes
     required_features = model.feature_names if model.feature_names else []
     missing_features = [feat for feat in required_features if feat not in historical_data.columns]
     
@@ -104,7 +118,7 @@ def generate_predictions(
     alerts = []
     for idx, row in future_predictions.iterrows():
         # Alertes pour les pics d'admissions
-        if row['admission_alert']:
+        if row.get('admission_alert', False):
             alerts.append({
                 'date': row['date'].strftime('%Y-%m-%d') if isinstance(row['date'], pd.Timestamp) else row['date'],
                 'type': 'admissions',
@@ -114,7 +128,7 @@ def generate_predictions(
             })
         
         # Alertes pour le taux d'occupation
-        if row['occupancy_alert']:
+        if row.get('occupancy_alert', False):
             alerts.append({
                 'date': row['date'].strftime('%Y-%m-%d') if isinstance(row['date'], pd.Timestamp) else row['date'],
                 'type': 'occupancy',
@@ -144,6 +158,7 @@ def generate_predictions(
         logger.info(f"Alertes sauvegardées dans {alerts_file}")
     
     return future_predictions, alerts
+
 
 def visualize_predictions(
     model: HospitalPredictionModel, 
@@ -185,26 +200,22 @@ def visualize_predictions(
     # Créer la figure de visualisation
     fig = model.plot_predictions(
         X=combined_features, 
-        y_true_admissions=historical_data['totalAdmissions'].tail(50),
-        y_true_occupancy=historical_data['avgOccupancyRate'].tail(50),
+        y_true_admissions=historical_data['totalAdmissions'].tail(50) if 'totalAdmissions' in historical_data.columns else None,
+        y_true_occupancy=historical_data['avgOccupancyRate'].tail(50) if 'avgOccupancyRate' in historical_data.columns else None,
         dates=all_dates,
         future_days=len(future_predictions)
     )
     
     # Sauvegarder la figure si un répertoire est spécifié
     if output_dir:
-        # Créer le répertoire s'il n'existe pas
         os.makedirs(output_dir, exist_ok=True)
-        
-        # Générer un nom de fichier unique
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        
-        # Sauvegarder la figure
         plot_file = os.path.join(output_dir, f'predictions_plot_{timestamp}.png')
         fig.savefig(plot_file)
         logger.info(f"Visualisation des prédictions sauvegardée dans {plot_file}")
     
     return fig
+
 
 def predict_daily_admissions(
     data_path: str, 
@@ -258,12 +269,11 @@ def predict_daily_admissions(
     )
     
     logger.info("Processus de prédiction terminé avec succès")
-    
     return future_predictions, alerts
+
 
 # Exemple d'utilisation
 if __name__ == "__main__":
-    # Exemple d'utilisation de la fonction principale
     try:
         # Chemins à personnaliser selon votre configuration
         data_path = "data/processed/hospital_data.csv"
@@ -282,6 +292,6 @@ if __name__ == "__main__":
         print("\nRésumé des alertes:")
         for alert in alerts:
             print(f"{alert['date']} - {alert['message']}")
-        
+    
     except Exception as e:
         logger.error(f"Erreur lors de la prédiction : {str(e)}")
