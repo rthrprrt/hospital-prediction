@@ -9,8 +9,12 @@ from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
 # Import des modules locaux
-from src.hospital_prediction.predict import (
+import sys
+sys.path.append('.')
+
+from hospital_prediction.predict import (
     load_prediction_model,
     generate_predictions,
     visualize_predictions
