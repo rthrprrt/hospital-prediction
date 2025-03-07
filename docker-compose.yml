@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # Service pour l'entraînement du modèle
+  train:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    command: python -m src.scripts.train_model --data-file /app/data/raw/hospital_data.csv --output-dir /app/models
+    environment:
+      - PYTHONPATH=/app
+
+  # Service pour générer des prédictions
+  predict:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./predictions:/app/predictions
+      - ./logs:/app/logs
+    command: python -m src.scripts.generate_predictions 
+      --data-file /app/data/processed/daily_data.csv 
+      --model-dir /app/models 
+      --output-dir /app/predictions 
+      --days 30
+    environment:
+      - PYTHONPATH=/app
+
+  # Service pour l'analyse des données (optionnel)
+  analysis:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    command: jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root
+    ports:
+      - "8888:8888"
+    environment:
+      - PYTHONPATH=/app
+
+volumes:
+  data:
+  models:
+  predictions:
+  logs:
