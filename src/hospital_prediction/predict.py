@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Union
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+
 
 # Import des modules locaux
 from src.hospital_prediction.model import HospitalPredictionModel
