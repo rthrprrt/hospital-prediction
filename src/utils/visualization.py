@@ -1,13 +1,6 @@
 # src/utils/visualization.py
-
 import matplotlib.pyplot as plt
-import pandas as pd
 import os
-import logging
-from typing import List, Tuple
-from matplotlib.figure import Figure
-
-logger = logging.getLogger('hospital_prediction.visualization')
 
 def plot_predictions(dates, y_true, y_pred, title="Prédictions vs Réalité"):
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -27,3 +20,16 @@ def save_figure(fig, output_dir: str, filename: str, dpi: int = 300):
     file_path = os.path.join(output_dir, filename)
     fig.savefig(file_path, dpi=dpi, bbox_inches='tight')
     return file_path
+
+def plot_feature_importance(feature_names, importances, title="Importance des Features"):
+    fig, ax = plt.subplots(figsize=(12, 6))
+    indices = sorted(range(len(importances)), key=lambda i: importances[i], reverse=True)
+    sorted_features = [feature_names[i] for i in indices]
+    sorted_importances = [importances[i] for i in indices]
+
+    ax.barh(sorted_features, sorted_importances, align='center')
+    ax.set_xlabel("Importance")
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.show()
+    return fig
