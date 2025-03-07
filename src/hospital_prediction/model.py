@@ -463,7 +463,7 @@ def predict_future(self, last_data, days=30):
     logger.info(f"Prédictions générées pour la période du {future_df['date'].min().strftime('%Y-%m-%d')} au {future_df['date'].max().strftime('%Y-%m-%d')}")
     return future_df
     
-    def save(self, filename_prefix=None):
+def save(self, filename_prefix=None):
         """
         Sauvegarder les modèles entraînés
         
@@ -513,7 +513,7 @@ def predict_future(self, last_data, days=30):
             'metadata': metadata_path
         }
     
-    def load(self, admission_model_path, occupancy_model_path, metadata_path=None):
+def load(self, admission_model_path, occupancy_model_path, metadata_path=None):
         """
         Charger des modèles entraînés
         
@@ -543,7 +543,7 @@ def predict_future(self, last_data, days=30):
         
         logger.info("Modèles chargés avec succès")
     
-    def plot_feature_importance(self, model_type='both', top_n=10):
+def plot_feature_importance(self, model_type='both', top_n=10):
         """
         Visualiser l'importance des features
         
@@ -620,7 +620,7 @@ def predict_future(self, last_data, days=30):
         
         return fig
     
-    def plot_predictions(self, X, y_true_admissions=None, y_true_occupancy=None, dates=None, future_days=0):
+def plot_predictions(self, X, y_true_admissions=None, y_true_occupancy=None, dates=None, future_days=0):
         """
         Visualiser les prédictions par rapport aux valeurs réelles
         
@@ -724,7 +724,7 @@ def predict_future(self, last_data, days=30):
         
         return fig
     
-    def get_seasonal_patterns(self, df, target_col_admissions, target_col_occupancy):
+def get_seasonal_patterns(self, df, target_col_admissions, target_col_occupancy):
         """
         Analyser les motifs saisonniers dans les données
         
