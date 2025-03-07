@@ -44,14 +44,17 @@ def prepare_data(input_file: str, output_dir: str = 'data/processed') -> pd.Data
     else:
         raise ValueError(f"Format de fichier non supporté : {input_file}")
 
-    # Prétraitement des données
+    # Prétraitement des données au niveau patient
     processed_data = raw_data.pipe(preprocess_hospital_data)
-
+    
+    # Agrégation des données au niveau journalier
+    daily_data = aggregate_daily_data(processed_data)
+    
     # Sauvegarder les données traitées
-    processed_data_path = save_processed_data(processed_data, output_dir)
-    logger.info(f"Données traitées sauvegardées dans {processed_data}")
+    processed_data_path = save_processed_data(daily_data, output_dir, "daily_aggregated_data.csv")
+    logger.info(f"Données agrégées sauvegardées dans {processed_data_path}")
 
-    return processed_data
+    return daily_data
 
 
 def train_model(input_file: str, model_dir: str = 'models', output_dir: str = 'data/processed',
