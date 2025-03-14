@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Service pour l'entraînement du modèle
+  # Service pour l'entraînement du modèle avec données synthétiques
   train:
     build: 
       context: .
@@ -10,7 +10,7 @@ services:
       - ./data:/app/data
       - ./models:/app/models
       - ./logs:/app/logs
-    command: python -m src.scripts.train_model --data-file /app/data/raw/hospital_data.csv --output-dir /app/models
+    command: python -m src.scripts.train_model --use-synthetic --model-dir /app/models --output-dir /app/data/processed
     environment:
       - PYTHONPATH=/app
 
@@ -24,26 +24,24 @@ services:
       - ./models:/app/models
       - ./predictions:/app/predictions
       - ./logs:/app/logs
-    command: python -m src.scripts.generate_predictions 
-      --data-file /app/data/processed/daily_data.csv 
-      --model-dir /app/models 
-      --output-dir /app/predictions 
-      --days 30
+    depends_on:
+      - train
+    command: python -m src.scripts.generate_predictions --data-file /app/data/processed/synthetic_hospital_data.csv --model-dir /app/models --output-dir /app/predictions --days 30
     environment:
       - PYTHONPATH=/app
 
-  # Service pour l'analyse des données (optionnel)
-  analysis:
+  # Service pour la validation du modèle
+  validate:
     build: 
       context: .
       dockerfile: Dockerfile
     volumes:
       - ./data:/app/data
       - ./models:/app/models
-      - ./logs:/app/logs
-    command: jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root
-    ports:
-      - "8888:8888"
+      - ./validation_results:/app/validation_results
+    depends_on:
+      - train
+    command: python -m src.scripts.validate_model --model-path /app/models --data-file /app/data/processed/synthetic_hospital_data.csv --output-dir /app/validation_results
     environment:
       - PYTHONPATH=/app
 
@@ -52,3 +50,4 @@ volumes:
   models:
   predictions:
   logs:
+  validation_results:
